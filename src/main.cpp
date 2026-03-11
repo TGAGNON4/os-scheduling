@@ -85,7 +85,15 @@ int main(int argc, char *argv[])
     {
         // Do the following:
         //   - Get current time
+        uint64_t time = currentTime();
         //   - *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
+        shared_data->queue_mutex.lock();
+        for(i = 0; i < config->num_processes; i++){
+            if(config->processes[i] == Process::State::NotStarted){
+
+            }
+        }
+
         //   - *Check if any processes have finished their I/O burst, and if so put that process back in the ready queue
         //   - *Check if any running process need to be interrupted (RR time slice expires or newly ready process has higher priority)
         //     - NOTE: ensure processes are inserted into the ready queue at the proper position based on algorithm
