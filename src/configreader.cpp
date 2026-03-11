@@ -1,6 +1,6 @@
 #include "configreader.h"
 
-SchedulerConfig* readConfigFile(const char *filename)
+SchedulerConfig* scr::readConfigFile(const char *filename)
 {
     std::string line;
     std::ifstream file(filename);
@@ -75,7 +75,7 @@ SchedulerConfig* readConfigFile(const char *filename)
     return config;
 }
 
-void deleteConfig(SchedulerConfig *config)
+void scr::deleteConfig(SchedulerConfig *config)
 {
     int i;
     for (i = 0; i < config->num_processes; i++)
