@@ -1,3 +1,4 @@
+// compile: g++ -std=c++14 -o main main.cpp
 #include <iostream>
 #include <string>
 #include <list>
