@@ -10,6 +10,10 @@
 #include "configreader.h"
 #include "process.h"
 
+// Algos to Implement
+// PP - Thomas
+// RR, FCFS, SJF - Andres
+
 // Shared data for all cores
 typedef struct SchedulerData {
     std::mutex queue_mutex;
@@ -88,7 +92,6 @@ int main(int argc, char *argv[])
         //   - Determine if all processes are in the terminated state
         //   - * = accesses shared data (ready queue), so be sure to use proper synchronization
 
-        // Maybe simply print progress bar for all procs?
         printProcessOutput(processes);
 
         // sleep 50 ms
@@ -105,6 +108,7 @@ int main(int argc, char *argv[])
         schedule_threads[i].join();
     }
 
+    // Thomas
     // print final statistics (use `printw()` for each print, and `refresh()` after all prints)
     //  - CPU utilization
     //  - Throughput
@@ -122,6 +126,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// Thomas
 void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
 {
     // Work to be done by each core idependent of the other cores

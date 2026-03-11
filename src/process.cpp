@@ -126,6 +126,7 @@ void Process::interruptHandled()
     is_interrupted = false;
 }
 
+// Thomas
 void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
