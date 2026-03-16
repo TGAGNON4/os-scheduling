@@ -127,10 +127,33 @@ void Process::interruptHandled()
 }
 
 // Thomas
+    uint16_t pid;               // process ID
+    uint32_t start_time;        // ms after program starts that process should be 'launched'
+    uint16_t num_bursts;        // number of CPU/IO bursts
+    uint16_t current_burst;     // current index into the CPU/IO burst array
+    uint32_t *burst_times;      // CPU/IO burst array of times (in ms)
+    uint8_t priority;           // process priority (0-4)
+    uint64_t burst_start_time;  // time that the current CPU/IO burst began
+    State state;                // process state
+    bool is_interrupted;        // whether or not the process is being interrupted
+    int8_t core;                // CPU core currently running on
+    int32_t turn_time;          // total time since 'launch' (until terminated)
+    int32_t wait_time;          // total time spent in ready queue
+    int32_t cpu_time;           // total time spent running on a CPU core
+    int32_t remain_time;        // CPU time remaining until terminated
+    int32_t total_time;         // total CPU time for all bursts
+    uint64_t launch_time;       // actual time in ms (since epoch) that process was 'launched'
 void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
     // cpu time, and remaining time
+    if(remain_time == 0){
+        turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
+    }
+    if(state == State::Ready){
+        wait_time += 0; // FIX wait time is how long it is in the READY state
+    }
+
 }
 
 void Process::updateBurstTime(int burst_idx, uint32_t new_time)
