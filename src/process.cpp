@@ -30,6 +30,8 @@ Process::Process(ProcessDetails details, uint64_t current_time)
         total_time += burst_times[i];
     }
     remain_time = total_time;
+    
+    update_time = 0;
 }
 
 Process::~Process()
@@ -144,18 +146,31 @@ void Process::interruptHandled()
     int32_t remain_time;        // CPU time remaining until terminated
     int32_t total_time;         // total CPU time for all bursts
     uint64_t launch_time;       // actual time in ms (since epoch) that process was 'launched'
+
+    int32_t update_time;        // time since updateProcess() was called
+    enum State : uint8_t { NotStarted, Ready, Running, IO, Terminated };
 */
 void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
     // cpu time, and remaining time
-    if(remain_time == 0){
+
+    // turnaround time updated once Terminated
+    if(state == State::Terminated){
         turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
     }
+
+    // wait time updated only if waiting
     if(state == State::Ready){
-        wait_time += current_time - total_time; // wait time is how long it is in the READY state
+        wait_time = (current_time - update_time); // wait time is how long it is in the READY state (assuming in wait)
     }
 
+    // burst times and CPU time updated if it is currently running
+    if(state == State::Running){
+        burst_times
+    }
+
+    update_time = current_time; // update update_time
 }
 
 void Process::updateBurstTime(int burst_idx, uint32_t new_time)
