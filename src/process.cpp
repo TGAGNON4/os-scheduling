@@ -127,6 +127,7 @@ void Process::interruptHandled()
 }
 
 // Thomas
+/*
     uint16_t pid;               // process ID
     uint32_t start_time;        // ms after program starts that process should be 'launched'
     uint16_t num_bursts;        // number of CPU/IO bursts
@@ -143,6 +144,7 @@ void Process::interruptHandled()
     int32_t remain_time;        // CPU time remaining until terminated
     int32_t total_time;         // total CPU time for all bursts
     uint64_t launch_time;       // actual time in ms (since epoch) that process was 'launched'
+*/
 void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
@@ -151,7 +153,7 @@ void Process::updateProcess(uint64_t current_time)
         turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
     }
     if(state == State::Ready){
-        wait_time += 0; // FIX wait time is how long it is in the READY state
+        wait_time += current_time - total_time; // wait time is how long it is in the READY state
     }
 
 }
