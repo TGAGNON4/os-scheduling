@@ -155,20 +155,45 @@ void Process::updateProcess(uint64_t current_time)
     // use `current_time` to update turnaround time, wait time, burst times, 
     // cpu time, and remaining time
 
-    // turnaround time updated once Terminated
-    if(state == State::Terminated){
-        turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
-    }
-
     // wait time updated only if waiting
     if(state == State::Ready){
         wait_time = (current_time - update_time); // wait time is how long it is in the READY state (assuming in wait)
     }
+    // burst times, CPU, and remain time updated if process is running
+    else if(state == State::Running){
+        if(remain_time <= update_time){
+            remain_time = 0;
+            cpu_time += remain_time; // CPU time spent if remain time < update_time
+        }
+        else{
+            remain_time -= update_time;
+            cpu_time += update_time; // CPU time spent if remain time > update_time
+        }
 
-    // burst times and CPU time updated if it is currently running
-    if(state == State::Running){
-        burst_times
+        if((burst_times[current_burst] - update_time) <= 0){ // finished burst of CPU
+            burst_times[current_burst] = 0;
+            current_burst++;
+        }
+        else{
+            burst_times[current_burst] -= update_time; // decrement remaining burst time
+        }
     }
+    // burst times updated if process is in IO
+    else if(state == State::IO){
+        if(burst_times[current_burst] <= update_time){ // finished burst of IO
+            burst_times[current_burst] = 0;
+            current_burst++;
+        }
+        else{
+            burst_times[current_burst] -= update_time; // decrement remaining burst time
+        }
+    }
+    // turnaround time updated once Terminated and not after
+    else if(state == State::Terminated){
+        if(turn_time == 0){
+            turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
+        } // using start_time not launch_time since time from start to launch is waiting
+    } 
 
     update_time = current_time; // update update_time
 }
