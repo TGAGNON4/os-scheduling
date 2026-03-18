@@ -1,4 +1,4 @@
-// compile: g++ -std=c++14 -o main main.cpp
+// compile: make
 #include <iostream>
 #include <string>
 #include <list>
@@ -86,11 +86,16 @@ int main(int argc, char *argv[])
         // Do the following:
         //   - Get current time
         uint64_t time = currentTime();
-        //   - *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
-        shared_data->queue_mutex.lock();
-        for(i = 0; i < config->num_processes; i++){
-            if(config->processes[i] == Process::State::NotStarted){
 
+        //   - *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
+        
+        for(int i = 0; i << config->num_processes; i++){
+            //Process *p = new Process(config->processes[i], time);
+            // If process should be launched now, add to ready queue
+            if(time == processes[i]->getStartTime()){
+                shared_data->queue_mutex.lock();
+                shared_data->ready_queue.push_back(processes[i]);
+                shared_data->queue_mutex.unlock();
             }
         }
 
@@ -139,21 +144,51 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
 {
     // Work to be done by each core idependent of the other cores
     // Repeat until all processes in terminated state:
-    //   - *Get process at front of ready queue
-    //   - IF READY QUEUE WAS NOT EMPTY
-    //    - Wait context switching load time
-    //    - Simulate the processes running (i.e. sleep for short bits, e.g. 5 ms, and call the processes `updateProcess()` method)
-    //      until one of the following:
-    //      - CPU burst time has elapsed
-    //      - Interrupted (RR time slice has elapsed or process preempted by higher priority process)
-    //   - Place the process back in the appropriate queue
-    //      - I/O queue if CPU burst finished (and process not finished) -- no actual queue, simply set state to IO
-    //      - Terminated if CPU burst finished and no more bursts remain -- set state to Terminated
-    //      - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
-    //   - Wait context switching save time
-    //  - IF READY QUEUE WAS EMPTY
-    //   - Wait short bit (i.e. sleep 5 ms)
-    //  - * = accesses shared data (ready queue), so be sure to use proper synchronization
+    while(shared_data->all_terminated == false){
+        
+        //   - IF READY QUEUE WAS NOT EMPTY
+        if(!shared_data->ready_queue.empty()){
+            //   - *Get process at front of ready queue
+            shared_data->queue_mutex.lock();
+            Process *p = shared_data->ready_queue.front();
+            p->setState(Process::State::Running, currentTime());
+            shared_data->queue_mutex.unlock();
+            p->setCpuCore(core_id);
+
+            //    - Wait context switching load time
+            std::this_thread::sleep_for(std::chrono::milliseconds(shared_data->context_switch));
+
+            //    - Simulate the processes running (i.e. sleep for short bits, e.g. 5 ms, and call the processes `updateProcess()` method)
+            //      until one of the following:
+            //      - CPU burst time has elapsed
+            //      - Interrupted (RR time slice has elapsed or process preempted by higher priority process)
+            //while(){
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p->updateProcess(currentTime());
+            //}
+
+            //   - Place the process back in the appropriate queue
+            //      - I/O queue if CPU burst finished (and process not finished) -- no actual queue, simply set state to IO
+            //      - Terminated if CPU burst finished and no more bursts remain -- set state to Terminated
+            //      - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
+            if(p->getRemainingTime() == 0){
+                p->setState(Process::State::Terminated, currentTime());
+            }
+            shared_data->queue_mutex.lock();
+            shared_data->ready_queue.push_back(p);
+            shared_data->queue_mutex.unlock();
+            p->setState(Process::State::Ready, currentTime());
+
+            //   - Wait context switching save time
+            std::this_thread::sleep_for(std::chrono::milliseconds(shared_data->context_switch));
+        }
+            //  - IF READY QUEUE WAS EMPTY
+        else{
+            //   - Wait short bit (i.e. sleep 5 ms)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        //  - * = accesses shared data (ready queue), so be sure to use proper synchronization
+    }
 }
 
 void printProcessOutput(std::vector<Process*>& processes)
