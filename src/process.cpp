@@ -31,7 +31,7 @@ Process::Process(ProcessDetails details, uint64_t current_time)
     }
     remain_time = total_time;
     
-    update_time = 0;
+    update_time = current_time;
 }
 
 Process::~Process()
@@ -91,7 +91,7 @@ double Process::getCpuTime() const
 
 double Process::getTotalRunTime() const
 {
-    return (double)remain_time / 1000.0;
+    return (double)total_time / 1000.0;
 }
 
 double Process::getRemainingTime() const
@@ -154,48 +154,55 @@ void Process::updateProcess(uint64_t current_time)
 {
     // use `current_time` to update turnaround time, wait time, burst times, 
     // cpu time, and remaining time
+    int delta_time = current_time - update_time;
 
     // wait time updated only if waiting
     if(getState() == State::Ready){
-        wait_time += update_time; // wait time is how long it is in the READY state (assuming in wait)
+        wait_time += delta_time; // wait time is how long it is in the READY state (assuming in wait)
     }
     // burst times, CPU, and remain time updated if process is running
     else if(getState() == State::Running){
-        if(remain_time <= update_time){
+        if(remain_time <= delta_time){
             remain_time = 0;
             cpu_time += remain_time; // CPU time spent if remain time <= update_time
         }
         else{
-            remain_time -= update_time;
-            cpu_time += update_time; // CPU time spent if remain time > update_time
+            remain_time -= delta_time;
+            cpu_time += delta_time; // CPU time spent if remain time > update_time
         }
 
-        if((burst_times[current_burst] - update_time) <= 0){ // finished burst of CPU
+        if(((int32_t)burst_times[current_burst] - delta_time) <= 0){ // finished burst of CPU
             burst_times[current_burst] = 0;
             current_burst++;
+            if(current_burst >= num_bursts){
+                setState(State::Terminated, current_time);
+                turn_time = current_time - start_time;
+            }
+            else{
+                setState(State::IO, current_time);
+            }
+            update_time = current_time;
+            return;
         }
         else{
-            burst_times[current_burst] -= update_time; // decrement remaining burst time
+            burst_times[current_burst] -= delta_time; // decrement remaining burst time
         }
     }
     // burst times updated if process is in IO
     else if(getState() == State::IO){
-        if(burst_times[current_burst] <= update_time){ // finished burst of IO
+        if((int32_t)burst_times[current_burst] <= delta_time){ // finished burst of IO
             burst_times[current_burst] = 0;
             current_burst++;
+            setState(State::Ready, current_time);
+            update_time = current_time;
+            return;
         }
         else{
-            burst_times[current_burst] -= update_time; // decrement remaining burst time
+            burst_times[current_burst] -= delta_time; // decrement remaining burst time
         }
     }
-    // turnaround time updated once Terminated and not after
-    else if(getState() == State::Terminated){
-        if(turn_time == 0){
-            turn_time = current_time - start_time; // turnaround time defined as time it takes to complete a task
-        } // using start_time not launch_time since time from start to launch is waiting
-    } 
 
-    remain_time -= update_time;
+    //remain_time -= update_time;
     update_time = current_time; // update update_time
 }
 
