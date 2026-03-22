@@ -163,8 +163,8 @@ void Process::updateProcess(uint64_t current_time)
     // burst times, CPU, and remain time updated if process is running
     else if(getState() == State::Running){
         if(remain_time <= delta_time){
-            remain_time = 0;
             cpu_time += remain_time; // CPU time spent if remain time <= update_time
+            remain_time = 0;
         }
         else{
             remain_time -= delta_time;
@@ -176,7 +176,7 @@ void Process::updateProcess(uint64_t current_time)
             current_burst++;
             if(current_burst >= num_bursts){
                 setState(State::Terminated, current_time);
-                turn_time = current_time - start_time;
+                turn_time = current_time - launch_time;
             }
             else{
                 setState(State::IO, current_time);
@@ -202,7 +202,6 @@ void Process::updateProcess(uint64_t current_time)
         }
     }
 
-    //remain_time -= update_time;
     update_time = current_time; // update update_time
 }
 

@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
     int i;
     SchedulerData *shared_data = new SchedulerData();
     std::vector<Process*> processes;
+    uint64_t end_time = 0;
 
     // Read configuration file for scheduling simulation
     SchedulerConfig *config = scr::readConfigFile(argv[1]);
@@ -88,7 +89,6 @@ int main(int argc, char *argv[])
         uint64_t time = currentTime();
 
         //   - *Check if any processes need to move from NotStarted to Ready (based on elapsed time), and if so put that process in the ready queue
-        
         for(int i = 0; i < processes.size(); i++){
             // If not started process should be launched now, add to ready queue
             if((time-start >= processes[i]->getStartTime()) && (processes[i]->getState() == Process::State::NotStarted)){
@@ -126,6 +126,7 @@ int main(int argc, char *argv[])
             if (processes[i]->getState() == Process::State::Terminated) {
                 if(i == processes.size()-1){
                     shared_data->all_terminated = true;
+                    end_time = currentTime();
                 }
             }
             else{
@@ -163,16 +164,16 @@ int main(int argc, char *argv[])
     double total_turnaround_time = 0;
     double total_time = 0;
     for (int i = 0; i < processes.size(); i++) {
-        total_cpu_time += processes[i]->getCpuTime();
+        total_cpu_time += 1000 * processes[i]->getCpuTime(); // converted to ms
         total_waiting_time += processes[i]->getWaitTime();
         total_turnaround_time += processes[i]->getTurnaroundTime();
         total_time += processes[i]->getTotalRunTime();
     }
-    printw("CPU Utilization %.2f\n", (total_cpu_time/total_time));
+    printw("CPU Utilization %.2f\n", ((total_cpu_time)/(double)(num_cores * (end_time - start))));
     printw("Average Wait Time %.2f\n", (total_waiting_time/(double)(processes.size())));
     printw("Average Turnaround Time %.2f\n", (total_turnaround_time/(double)(processes.size())));
     refresh();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(20000)); // wait so I can see the results
 
     // Clean up before quitting program
     processes.clear();
@@ -193,19 +194,20 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
         if(!shared_data->ready_queue.empty()){
             //   - *Get process at front of ready queue
             Process *p = shared_data->ready_queue.front();
-            p->setState(Process::State::Running, currentTime());
-            shared_data->ready_queue.pop_front();
+            shared_data->ready_queue.pop_front(); // remove from the front of the queue
             shared_data->queue_mutex.unlock();
-            p->setCpuCore(core_id);
-
+            
             //    - Wait context switching load time
             std::this_thread::sleep_for(std::chrono::milliseconds(shared_data->context_switch));
+            
+            p->setCpuCore(core_id); // put in on a core
+            p->setState(Process::State::Running, currentTime()); // now proccess is running
 
             //    - Simulate the processes running (i.e. sleep for short bits, e.g. 5 ms, and call the processes `updateProcess()` method)
             //      until one of the following:
             //      - CPU burst time has elapsed
             //      - Interrupted (RR time slice has elapsed or process preempted by higher priority process)
-            while(p->getState() == Process::State::Running){
+            while((p->getState() == Process::State::Running) && (p->isInterrupted() == false)){
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 p->updateProcess(currentTime());
             }
@@ -214,14 +216,8 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             //   - Place the process back in the appropriate queue
             //      - I/O queue if CPU burst finished (and process not finished) -- no actual queue, simply set state to IO
             //      - Terminated if CPU burst finished and no more bursts remain -- set state to Terminated
-            //      - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
 
-            // might be needed for interrupts
-            // if(p->getState() == Process::State::Ready){
-            //     shared_data->queue_mutex.lock();
-            //     shared_data->ready_queue.push_back(p);
-            //     shared_data->queue_mutex.unlock();
-            // }
+            //      - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
 
             p->setCpuCore(-1);
             //   - Wait context switching save time
