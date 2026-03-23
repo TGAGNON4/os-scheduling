@@ -164,18 +164,39 @@ int main(int argc, char *argv[])
     double total_turnaround_time = 0;
     double total_time = 0;
     for (int i = 0; i < processes.size(); i++) {
-        total_cpu_time += 1000 * processes[i]->getCpuTime(); // converted to ms
+        total_cpu_time += 1000 * processes[i]->getCpuTime(); // converted to ms as end_time - start is in ms
         total_waiting_time += processes[i]->getWaitTime();
         total_turnaround_time += processes[i]->getTurnaroundTime();
         total_time += processes[i]->getTotalRunTime();
     }
     printw("CPU Utilization %.2f\n", ((total_cpu_time)/(double)(num_cores * (end_time - start))));
+    
+    // Throughputs (will work as long as num processes > 1)
+    double *finish_times = new double[processes.size()];
+    for(int i = 0; i < processes.size(); i++){
+        // finish time is time it took to run the process (turn_time) + start time
+        finish_times[i] = processes[i]->getTurnaroundTime() + (processes[i]->getStartTime())/1000.0;
+    }
+    std::sort(finish_times, finish_times + processes.size()); // have an array of time took to complete each process in increasing order
+
+    int mid = processes.size() / 2;
+    double time_for_half = finish_times[mid - 1];
+    double time_for_last_half = finish_times[processes.size() - 1] - time_for_half;
+
+    // first half = half of the processes / time taken to complete the first half
+    printw("Throughput First Half %.2f\n", (double)(mid) / time_for_half);
+
+    // second half is the remaining processes / time taken to complete them
+    printw("Throughput Second Half %.2f\n", (double)(processes.size() - mid) / time_for_last_half);
+    printw("Overall Throughput %.2f\n", ((double)(processes.size()*1000)/(double)(end_time - start)));
+
     printw("Average Wait Time %.2f\n", (total_waiting_time/(double)(processes.size())));
     printw("Average Turnaround Time %.2f\n", (total_turnaround_time/(double)(processes.size())));
     refresh();
-    std::this_thread::sleep_for(std::chrono::milliseconds(20000)); // wait so I can see the results
+    std::this_thread::sleep_for(std::chrono::milliseconds(15000)); // wait so I can see the results
 
     // Clean up before quitting program
+    delete[] finish_times;
     processes.clear();
     endwin();
 
@@ -218,8 +239,13 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             //      - Terminated if CPU burst finished and no more bursts remain -- set state to Terminated
 
             //      - *Ready queue if interrupted (be sure to modify the CPU burst time to now reflect the remaining time)
-
-            p->setCpuCore(-1);
+            if(p->isInterrupted() == true){
+                shared_data->queue_mutex.lock();
+                p->updateProcess(currentTime()); // modify CPU burst time
+                shared_data->ready_queue.push_back(p);
+                shared_data->queue_mutex.unlock();
+            }
+            p->setCpuCore(-1); // take process off the CPU
             //   - Wait context switching save time
             std::this_thread::sleep_for(std::chrono::milliseconds(shared_data->context_switch));
         }

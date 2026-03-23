@@ -185,6 +185,9 @@ void Process::updateProcess(uint64_t current_time)
             return;
         }
         else{
+            if(is_interrupted == true){ // put in Ready queue if interrupted
+                setState(State::Ready, current_time);
+            }
             burst_times[current_burst] -= delta_time; // decrement remaining burst time
         }
     }
