@@ -111,14 +111,37 @@ int main(int argc, char *argv[])
             }
         }
 
+        int num_of_running = 0;
+        int *indicies = new int[num_cores];
+        int *priorities = new int[num_cores];
+
         // update wait times
-        for (size_t i = 0; i < processes.size(); i++) {
+        for (int i = 0; i < processes.size(); i++) {
             if (processes[i]->getState() == Process::State::Ready) {
                 processes[i]->updateProcess(time);
             }
+
+            // for interrupt logic to know all running processes and their priorities
+            if (processes[i]->getState() == Process::State::Running){
+                indicies[num_of_running] = i; // index of first process running
+                priorities[num_of_running] = processes[i]->getPriority(); // priority level
+                num_of_running++;
+            }
         }
+
         //   - *Check if any running process need to be interrupted (RR time slice expires or newly ready process has higher priority)
         //     - NOTE: ensure processes are inserted into the ready queue at the proper position based on algorithm
+        int max_priority = 100;
+        if(shared_data->algorithm == ScheduleAlgorithm::PP){
+            // get highest priority of ready processes
+            for (int i = 0; i < shared_data->ready_queue.size(); i++){
+                
+            }
+
+            for (int i = 0; i < num_of_running; i++) {
+
+            }
+        }
 
 
         //   - Determine if all processes are in the terminated state
@@ -133,6 +156,9 @@ int main(int argc, char *argv[])
                 break;
             }
         }
+
+        delete[] indicies;
+        delete[] priorities;
         
         printProcessOutput(processes);
 
@@ -163,22 +189,21 @@ int main(int argc, char *argv[])
     double total_waiting_time = 0;
     double total_turnaround_time = 0;
     double total_time = 0;
+
+    // Throughputs (will work as long as num processes > 1)
+    double *finish_times = new double[processes.size()];
     for (int i = 0; i < processes.size(); i++) {
         total_cpu_time += 1000 * processes[i]->getCpuTime(); // converted to ms as end_time - start is in ms
         total_waiting_time += processes[i]->getWaitTime();
         total_turnaround_time += processes[i]->getTurnaroundTime();
         total_time += processes[i]->getTotalRunTime();
-    }
-    printw("CPU Utilization %.2f\n", ((total_cpu_time)/(double)(num_cores * (end_time - start))));
-    
-    // Throughputs (will work as long as num processes > 1)
-    double *finish_times = new double[processes.size()];
-    for(int i = 0; i < processes.size(); i++){
+
         // finish time is time it took to run the process (turn_time) + start time
         finish_times[i] = processes[i]->getTurnaroundTime() + (processes[i]->getStartTime())/1000.0;
     }
+    printw("CPU Utilization %.2f\n", ((total_cpu_time)/(double)(num_cores * (end_time - start))));
+    
     std::sort(finish_times, finish_times + processes.size()); // have an array of time took to complete each process in increasing order
-
     int mid = processes.size() / 2;
     double time_for_half = finish_times[mid - 1];
     double time_for_last_half = finish_times[processes.size() - 1] - time_for_half;
@@ -188,6 +213,8 @@ int main(int argc, char *argv[])
 
     // second half is the remaining processes / time taken to complete them
     printw("Throughput Second Half %.2f\n", (double)(processes.size() - mid) / time_for_last_half);
+
+    // total num of processes / total time taken for all processes / 1000 (ms to seconds)
     printw("Overall Throughput %.2f\n", ((double)(processes.size()*1000)/(double)(end_time - start)));
 
     printw("Average Wait Time %.2f\n", (total_waiting_time/(double)(processes.size())));
