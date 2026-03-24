@@ -26,6 +26,7 @@ typedef struct SchedulerData {
 
 void coreRunProcesses(uint8_t core_id, SchedulerData *data);
 void printProcessOutput(std::vector<Process*>& processes);
+void insertIntoReadyQueue(SchedulerData *data, Process *p);
 std::string makeProgressString(double percent, uint32_t width);
 uint64_t currentTime();
 std::string processStateToString(Process::State state);
@@ -120,7 +121,7 @@ int main(int argc, char *argv[])
             if (processes[i]->getState() == Process::State::Ready) {
                 processes[i]->updateProcess(time);
             }
-
+            
             // for interrupt logic to know all running processes and their priorities
             if (processes[i]->getState() == Process::State::Running){
                 indicies[num_of_running] = i; // index of first process running
@@ -129,20 +130,40 @@ int main(int argc, char *argv[])
             }
         }
 
+
         //   - *Check if any running process need to be interrupted (RR time slice expires or newly ready process has higher priority)
         //     - NOTE: ensure processes are inserted into the ready queue at the proper position based on algorithm
-        int max_priority = 100;
+        int max_priority = 100; // variable that holds the highest priority (low number) of a process in the ready queue
         if(shared_data->algorithm == ScheduleAlgorithm::PP){
+            shared_data->queue_mutex.lock();
             // get highest priority of ready processes
-            for (int i = 0; i < shared_data->ready_queue.size(); i++){
-                
+            std::list<Process*>::iterator readyqueue; // have to use this to iterate through the ready_queue list
+            for (readyqueue = shared_data->ready_queue.begin(); readyqueue != shared_data->ready_queue.end(); readyqueue++){
+                Process *p = *readyqueue;
+                if(p->getPriority() < max_priority){
+                    max_priority = p->getPriority();
+                }
             }
+            shared_data->queue_mutex.unlock();
 
-            for (int i = 0; i < num_of_running; i++) {
+            int min_priority = -1; // variable that holds the lowest priority (high number) of a running process
+            int min_index = -1; // variable that holds the index of the min_priority
 
+            // prempt a process if no open core and there is a process in the queue
+            if(num_of_running == num_cores && max_priority < 100){
+                // look for the lowest priority running process
+                for(int i = 0; i < num_of_running; i++){
+                    if(priorities[i] > min_priority){
+                        min_priority = priorities[i];
+                        min_index = indicies[i];
+                    }
+                }
+
+                if(max_priority < min_priority){
+                    processes[min_index]->interrupt();
+                }
             }
         }
-
 
         //   - Determine if all processes are in the terminated state
         for (int i = 0; i < processes.size(); i++) {
@@ -230,6 +251,10 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+void insertIntoReadyQueue(SchedulerData *data, Process *p){
+    if(data->algorithm)
+}
+
 // Thomas
 void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
 {
@@ -269,7 +294,8 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             if(p->isInterrupted() == true){
                 shared_data->queue_mutex.lock();
                 p->updateProcess(currentTime()); // modify CPU burst time
-                shared_data->ready_queue.push_back(p);
+                shared_data->ready_queue.push_back(p); // push back onto ready queue
+                p->interruptHandled();
                 shared_data->queue_mutex.unlock();
             }
             p->setCpuCore(-1); // take process off the CPU
