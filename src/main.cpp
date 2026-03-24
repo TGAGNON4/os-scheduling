@@ -26,7 +26,7 @@ typedef struct SchedulerData {
 
 void coreRunProcesses(uint8_t core_id, SchedulerData *data);
 void printProcessOutput(std::vector<Process*>& processes);
-void insertIntoReadyQueue(SchedulerData *data, Process *p);
+void insertIntoReadyQueue(SchedulerData *shared_data, Process *p);
 std::string makeProgressString(double percent, uint32_t width);
 uint64_t currentTime();
 std::string processStateToString(Process::State state);
@@ -67,7 +67,8 @@ int main(int argc, char *argv[])
         // If process should be launched immediately, add to ready queue
         if (p->getState() == Process::State::Ready)
         {
-            shared_data->ready_queue.push_back(p);
+            //shared_data->ready_queue.push_back(p);
+            insertIntoReadyQueue(shared_data, p); // even launched processes should follow algo
         }
     }
 
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
             if((time-start >= processes[i]->getStartTime()) && (processes[i]->getState() == Process::State::NotStarted)){
                 processes[i]->setState(Process::State::Ready, time);
                 shared_data->queue_mutex.lock();
-                shared_data->ready_queue.push_back(processes[i]);
+                insertIntoReadyQueue(shared_data, processes[i]);
                 shared_data->queue_mutex.unlock();
             }
         }
@@ -106,7 +107,7 @@ int main(int argc, char *argv[])
                 processes[i]->updateProcess(time); // make progress in IO burst
                 if (processes[i]->getState() == Process::State::Ready) { // add back into the ready queue
                     shared_data->queue_mutex.lock();
-                    shared_data->ready_queue.push_back(processes[i]);
+                    insertIntoReadyQueue(shared_data, processes[i]);
                     shared_data->queue_mutex.unlock();
                 }
             }
@@ -251,8 +252,26 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void insertIntoReadyQueue(SchedulerData *data, Process *p){
-    if(data->algorithm)
+void insertIntoReadyQueue(SchedulerData *shared_data, Process *p){
+    if(shared_data->algorithm == ScheduleAlgorithm::SJF){
+
+    }
+    else if(shared_data->algorithm == ScheduleAlgorithm::RR){
+
+    }
+    else if(shared_data->algorithm == ScheduleAlgorithm::PP){
+        std::list<Process*>::iterator readyqueue; // have to use this to iterate through the ready_queue list
+        for (readyqueue = shared_data->ready_queue.begin(); readyqueue != shared_data->ready_queue.end(); readyqueue++){
+            // increment through the ready queue until the current process is a higher priority
+            if((*readyqueue)->getPriority() > p->getPriority()){
+                break;
+            }
+        }
+        shared_data->ready_queue.insert(readyqueue, p);
+    }
+    else { // do FCFS by default
+        shared_data->ready_queue.push_back(p);
+    }
 }
 
 // Thomas
@@ -294,7 +313,7 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             if(p->isInterrupted() == true){
                 shared_data->queue_mutex.lock();
                 p->updateProcess(currentTime()); // modify CPU burst time
-                shared_data->ready_queue.push_back(p); // push back onto ready queue
+                insertIntoReadyQueue(shared_data, p); // push back onto ready queue
                 p->interruptHandled();
                 shared_data->queue_mutex.unlock();
             }
