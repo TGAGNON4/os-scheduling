@@ -253,6 +253,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// mutex has to be locked before this function is called and unlocked after
 void insertIntoReadyQueue(SchedulerData *shared_data, Process *p){
     if(shared_data->algorithm == ScheduleAlgorithm::SJF){
 
