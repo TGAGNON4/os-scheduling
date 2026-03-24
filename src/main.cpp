@@ -1,4 +1,5 @@
 // compile: make
+// run: ./bin/osscheduler ./resrc/config_01.txt
 #include <iostream>
 #include <string>
 #include <list>
