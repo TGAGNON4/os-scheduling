@@ -134,6 +134,17 @@ int main(int argc, char *argv[])
 
 
         //   - *Check if any running process need to be interrupted (RR time slice expires or newly ready process has higher priority)
+        if (shared_data->algorithm == ScheduleAlgorithm::RR) {
+            for (int i = 0; i < processes.size(); i++) {
+                if (processes[i]->getState() == Process::State::Running) {
+                    // Check if current burst has been running longer than the time slice
+                    uint64_t run_duration = time - processes[i]->getBurstStartTime();
+                    if (run_duration >= shared_data->time_slice) {
+                        processes[i]->interrupt();
+                    }
+                }
+            }
+}
         //     - NOTE: ensure processes are inserted into the ready queue at the proper position based on algorithm
         int max_priority = 100; // variable that holds the highest priority (low number) of a process in the ready queue
         if(shared_data->algorithm == ScheduleAlgorithm::PP){
@@ -256,9 +267,18 @@ int main(int argc, char *argv[])
 // mutex has to be locked before this function is called and unlocked after
 void insertIntoReadyQueue(SchedulerData *shared_data, Process *p){
     if(shared_data->algorithm == ScheduleAlgorithm::SJF){
-
+        std::list<Process*>::iterator it;
+        for (it = shared_data->ready_queue.begin(); it != shared_data->ready_queue.end(); it++) {
+            // SJF: Shortest remaining CPU time goes to the front
+            if ((*it)->getRemainingTime() > p->getRemainingTime()) {
+                break;
+            }
+            }
+        shared_data->ready_queue.insert(it, p);
     }
     else if(shared_data->algorithm == ScheduleAlgorithm::RR){
+            //Simply push back
+            shared_data->ready_queue.push_back(p);
 
     }
     else if(shared_data->algorithm == ScheduleAlgorithm::PP){
@@ -296,6 +316,9 @@ void coreRunProcesses(uint8_t core_id, SchedulerData *shared_data)
             
             p->setCpuCore(core_id); // put in on a core
             p->setState(Process::State::Running, currentTime()); // now proccess is running
+
+            // Reset the burst start time 
+            p->setBurstStartTime(currentTime());
 
             //    - Simulate the processes running (i.e. sleep for short bits, e.g. 5 ms, and call the processes `updateProcess()` method)
             //      until one of the following:
